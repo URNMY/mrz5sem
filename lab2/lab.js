@@ -175,7 +175,7 @@ const matrixModule = (() => {
     }
 
     return {
-        multiplyMatrices,
+        matrixMultiply,
         transposingMatrix,
         differenceMatrices,
         normalizeByRow,
@@ -253,10 +253,10 @@ const hammingNetworkModule = (function() {
     }
 
     function getNetworkOutput(inputVector) {
-        const output = matrixModule.multiplyMatrices(inputVector, weightMatrix);
-        const outputActivationFunctionApplied = matrixModule.applyFunctionToMatrixElements(output, activationFunction);
-        const outputReducerApplied = matrixModule.applyFunctionToMatrixElements(outputActivationFunctionApplied, valueReducer);
-        return outputReducerApplied;
+        const output = matrixModule.matrixMultiply(inputVector, weightMatrix);
+        const outputWithActivationFunction = matrixModule.applyFunctionToMatrixElements(output, activationFunction);
+        const outputWithReducer = matrixModule.applyFunctionToMatrixElements(outputWithActivationFunction, valueReducer);
+        return outputWithReducer;
     }
 
     function addVectorToMemory(vector) {
@@ -266,9 +266,9 @@ const hammingNetworkModule = (function() {
     function learningStep() {
         if (!vectorInANetwork.length) return;
         const X = matrixModule.transposingMatrix(vectorInANetwork);
-        const Xtransposed = matrixModule.transposingMatrix(X);
-        const middleTerm = matrixModule.inverseMatrix(matrixModule.multiplyMatrices(Xtransposed, X));
-        weightMatrix = matrixModule.multiplyMatrices(matrixModule.multiplyMatrices(X, middleTerm), Xtransposed);
+        const Xtranspose = matrixModule.transposingMatrix(X);
+        const middleTerm = matrixModule.inverseMatrix(matrixModule.matrixMultiply(Xtranspose, X));
+        weightMatrix = matrixModule.matrixMultiply(matrixModule.matrixMultiply(X, middleTerm), Xtranspose);
         console.log(vectorInANetwork);
         console.log(weightMatrix);
     }
@@ -291,17 +291,17 @@ const hammingNetworkModule = (function() {
 })();
 
 const fileReaderModule = (function() {
-    let currVector;
+    let currV;
 
     document.getElementById('text-file-input').addEventListener('change', function() {
         try {
             const reader = new FileReader();
             reader.onload = () => {
-                currVector = convertStringToVector(reader.result);
-                if (currVector.length !== inputVectorSize) {
-                    throw `Invalid input vector size: wanted ${inputVectorSize}, got ${currVector.length}`;
+                currV = convertStringToVector(reader.result);
+                if (currV.length !== inputVectorSize) {
+                    throw `Invalid input vector size: wanted ${inputVectorSize}, got ${currV.length}`;
                 }
-                canvasModule.getVector(currVector);
+                canvasModule.getVector(currV);
             }
             reader.readAsText(this.files[0]);
         }
@@ -310,8 +310,8 @@ const fileReaderModule = (function() {
         }
     });
 
-    function getCurrVector() {
-        return currVector;
+    function getCurrV() {
+        return currV;
     }
 
     function convertStringToVector(string) {
@@ -319,22 +319,22 @@ const fileReaderModule = (function() {
     }
 
     return {
-        getCurrVector
+        getCurrV
     }
 })();
 
 document.getElementById('convert').addEventListener('click', () => {
-    canvasModule.getVector(hammingNetworkModule.getNetworkOutput([fileReaderModule.getCurrVector()])[0], false);
+    canvasModule.getVector(hammingNetworkModule.getNetworkOutput([fileReaderModule.getCurrV()])[0], false);
 });
 
 document.getElementById('save-for-learning').addEventListener('click', () => {
-    const currVector = fileReaderModule.getCurrVector();
-    if (!currVector) return;
-    if (hammingNetworkModule.checkVectorAlreadyInANetwork(currVector)) {
+    const currV = fileReaderModule.getCurrV();
+    if (!currV) return;
+    if (hammingNetworkModule.checkVectorAlreadyInANetwork(currV)) {
         alert("this vector is already saved for learning");
         return;
     }
-    hammingNetworkModule.addVectorToMemory(currVector);
+    hammingNetworkModule.addVectorToMemory(currV);
     alert('saved!');
 });
 
