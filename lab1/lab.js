@@ -142,11 +142,11 @@ function setRandomWeights(secondLayerNeurons) {
         }
         firstWeights.push(newRow);
     }
-    const secondWeights = transposeMatrix(firstWeights);
+    const secondWeights = transposingMatrix(firstWeights);
     return [firstWeights, secondWeights];
 }
 
-function transposeMatrix(matrix) {
+function transposingMatrix(matrix) {
     const transposed = [];
     for(let j = 0; j < matrix[0].length; j++) {
         transposed.push(new Array(matrix.length));
@@ -176,16 +176,18 @@ function tuneWeights(weights, maxError, parameters) {
     const X = parameters.currInput;
     let Y = parameters.secondLayerValues;
     let Xtick = parameters.currOutput;
-    let diff = subtractMatrices(Xtick, X);
+    let diff = differenceMatrices(Xtick, X);
     let currError;
     do {
+        let i = 0;
         tuneSecondWeights(weights, Y, diff);
+        i++;
         tuneFirstWeights(weights, X, diff);
         normalizeByRow(weights[1]);
         normalizeByColumn(weights[0]);
         Y = neuralNetworkModule.matrixMultiply(X, weights[0]);
         Xtick = neuralNetworkModule.matrixMultiply(Y, weights[1]);
-        diff = subtractMatrices(Xtick, X);
+        diff = differenceMatrices(Xtick, X);
         currError = vectorSquare(diff[0]);
     }
     while(currError > maxError);
@@ -214,7 +216,7 @@ function normalizeByColumn(weightMatrix) {
         }
     }
 }
-function subtractMatrices(A, B) {
+function differenceMatrices(A, B) {
     const result = [];
     const height = A.length;
     const width = A[0].length;
@@ -227,23 +229,23 @@ function subtractMatrices(A, B) {
     return result;
 }
 
-function tuneFirstWeights(weights, X, diff) {
-    const inputTransposed = transposeMatrix(X);
+function tuneFirstWeights(weights, A, diff) {
+    const inputTransposed = transposingMatrix(A);
     const a = neuralNetworkModule.matrixMultiply(inputTransposed, diff);
-    const b = neuralNetworkModule.matrixMultiply(a, transposeMatrix(weights[1]));
-    const learningCoefficient = 1 / vectorSquare(transposeMatrix(inputTransposed)[0]);
+    const b = neuralNetworkModule.matrixMultiply(a, transposingMatrix(weights[1]));
+    const learningCoefficient = 1 / vectorSquare(transposingMatrix(inputTransposed)[0]);
     if(!isFinite(learningCoefficient)) return;
     multiplyMatrixByNumber(b, learningCoefficient);
-    weights[0] = subtractMatrices(weights[0], b);
+    weights[0] = differenceMatrices(weights[0], b);
 }
 
-function tuneSecondWeights(weights, Y, diff) {
-    const secondLayerValuesTransposed = transposeMatrix(Y);
+function tuneSecondWeights(weights, B, diff) {
+    const secondLayerValuesTransposed = transposingMatrix(B);
     const a = neuralNetworkModule.matrixMultiply(secondLayerValuesTransposed, diff);
-    const learningCoefficient = 1 / vectorSquare(transposeMatrix(secondLayerValuesTransposed)[0]);
+    const learningCoefficient = 1 / vectorSquare(transposingMatrix(secondLayerValuesTransposed)[0]);
     if(!isFinite(learningCoefficient)) return;
     multiplyMatrixByNumber(a, learningCoefficient);
-    weights[1] = subtractMatrices(weights[1], a);
+    weights[1] = differenceMatrices(weights[1], a);
 }
 
 function vectorSquare(vector) {
@@ -272,7 +274,6 @@ const subImageHeight = 2;
 const pixelsInSubImage = subImageWidth * subImageHeight;
 const imageWidth = 256;
 const imageHeight = 256;
-const pixelsInImage = imageWidth * imageHeight;
 const subImagesInOneRow = imageWidth / subImageWidth;
 const subImagesInOneColumn = imageHeight / subImageHeight;
 const valuesInAPixel = 3;
