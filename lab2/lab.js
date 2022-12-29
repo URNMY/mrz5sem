@@ -1,36 +1,31 @@
 const matrixModule = (() => {
-    function multiplyMatrices(matrix1, matrix2) {
+    function matrixMultiply(A, B)
+    {
+        const rowsA = A.length, columnsA = A[0].length,
+            rowsB = B.length, columnsB = B[0].length,
+            C = [];
+
         try {
-            if (matrix1[0].length !== matrix2.length) {
-                throw `Invalid multiplied matrix size; matrix1 width = ${matrix1[0].length}, matrix2 height = ${matrix2.length}`;
+            if (columnsA !== rowsB) {
+                throw `Invalid matrix size; A length = ${A[0].length}, B height = ${B.length}`;
             }
         }
         catch(err) {
             throw err;
         }
 
-        const product = [];
-        const rows = matrix1.length;
-        const columns = matrix2[0].length;
-        for(let i = 0; i < rows; i++) {
-            product.push(new Array(columns));
-            for(let j = 0; j < columns; j++) {
-                product[i][j] = multiplyIthRowAndJthColumn(matrix1, matrix2, i, j);
+        for (let i = 0; i < rowsA; i++) C[i] = [];
+        for (let k = 0; k < columnsB; k++) {
+            for (let i = 0; i < rowsA; i++) {
+                let newMatrixCell = 0;
+                for (let j = 0; j < rowsB; j++) newMatrixCell += A[i][j]*B[j][k];
+                C[i][k] = newMatrixCell;
             }
         }
-
-        return product;
+        return C;
     }
 
-    function multiplyIthRowAndJthColumn(matrix1, matrix2, i, j) {
-        let sum = 0;
-        for(let index = 0; index < matrix1[i].length; index++) {
-            sum += matrix1[i][index] * matrix2[index][j];
-        }
-        return sum;
-    }
-
-    function transposeMatrix(matrix) {
+    function transposingMatrix(matrix) {
         const transposed = [];
         for(let j = 0; j < matrix[0].length; j++) {
             transposed.push(new Array(matrix.length));
@@ -41,7 +36,7 @@ const matrixModule = (() => {
         return transposed;
     }
 
-    function subtractMatrices(matrix1, matrix2) {
+    function differenceMatrices(matrix1, matrix2) {
         const result = [];
         const height = matrix1.length;
         const width = matrix1[0].length;
@@ -81,16 +76,16 @@ const matrixModule = (() => {
         return newMatrix;
     }
 
-    function normalizeRow(matrix, rowIndex) {
-        const modulus = Math.sqrt(matrix[rowIndex].map(el => el * el).reduce((r, v) => r + v, 0));
-        for(let j = 0; j < matrix[rowIndex].length; j++) {
-            matrix[rowIndex][j] /= modulus;
+    function normalizeRow(matrix, indexRow) {
+        const modulus = Math.sqrt(matrix[indexRow].map(el => el * el).reduce((r, v) => r + v, 0));
+        for(let j = 0; j < matrix[indexRow].length; j++) {
+            matrix[indexRow][j] /= modulus;
         }
     }
 
-    function getMatrixInverse(matrix) {
-        const determinant = calcDeterminant(matrix);
-        const transposed = transposeMatrix(matrix);
+    function inverseMatrix(matrix) {
+        const determinant = calculateDet(matrix);
+        const transposed = transposingMatrix(matrix);
         const inverseHeight = matrix[0].length;
         const inverseWidth = matrix.length;
         for (let i = 0; i < inverseHeight; i++) {
@@ -103,10 +98,10 @@ const matrixModule = (() => {
         return multiplyMatrixByNumber(transposed, 1 / determinant);
     }
 
-    function calcDeterminant(matrix) {
+    function calculateDet(matrix) {
         try {
             if (matrix.length !== matrix[0].length) {
-                throw "Non-square matrix passed to the calcDeterminant function";
+                throw "Non-square matrix passed to the calculateDet function";
             }
             if (matrix.length === 1) {
                 return matrix[0][0];
@@ -116,7 +111,7 @@ const matrixModule = (() => {
                 for (let column = 0; column < matrix[0].length; column++) {
                     const currMultiplier = matrix[0][column];
                     const sign = column % 2 === 0 ? 1 : -1;
-                    determinant += calcDeterminant(ignoreIthRowAndJthColumn(matrix, 0, column)) * currMultiplier * sign;
+                    determinant += calculateDet(ignoreIthRowAndJthColumn(matrix, 0, column)) * currMultiplier * sign;
                 }
                 return determinant;
             }
@@ -157,7 +152,7 @@ const matrixModule = (() => {
         return false;
     }
 
-    function getRandomMatrix(height, width, zeroedMainDiagonal = true, bottomClamp = -1, topClamp = 1) {
+    function getRandMatrix(height, width, zeroedMainDiagonal = true, bottomClamp = -1, topClamp = 1) {
         const matrix = new Array(height).fill().map(el => new Array(width));
         for (let i = 0; i < height; i++) {
             for (let j = 0; j < width; j++) {
@@ -165,13 +160,13 @@ const matrixModule = (() => {
                     matrix[i][j] = 0;
                     continue;
                 }
-                matrix[i][j] = randomNumberFromRange(bottomClamp, topClamp);
+                matrix[i][j] = randNumberInRange(bottomClamp, topClamp);
             }
         }
         return matrix;
     }
 
-    function randomNumberFromRange(leftBound, rightBound) {
+    function randNumberInRange(leftBound, rightBound) {
         return (rightBound - leftBound) * Math.random() + leftBound;
     }
 
@@ -181,80 +176,80 @@ const matrixModule = (() => {
 
     return {
         multiplyMatrices,
-        transposeMatrix,
-        subtractMatrices,
+        transposingMatrix,
+        differenceMatrices,
         normalizeByRow,
         normalizeByColumn,
         multiplyMatrixByNumber,
-        getMatrixInverse,
+        inverseMatrix,
         areVectorsLinearlyIndependent,
-        getRandomMatrix,
+        getRandMatrix,
         applyFunctionToMatrixElements,
-        calcDeterminant
+        calculateDet
     }
 })();
 
 const inputVectorSize = 900;
 
 const canvasModule = (function() {
-    const alphaPixelsInDimension = Math.floor(Math.sqrt(inputVectorSize));
-    const alphaPixelSize = 8;
-    const canvasSize = alphaPixelSize * alphaPixelsInDimension;
-
+    const pixelsInDimension = Math.floor(Math.sqrt(inputVectorSize));
+    const pixelSize = 8;
+    const canvasSize = pixelSize * pixelsInDimension;
+    const strCanvasSize = canvasSize.toString();
     const inputCanvas = document.getElementById('input');
     const outputCanvas = document.getElementById('output');
-    inputCanvas.setAttribute('width', canvasSize);
-    inputCanvas.setAttribute('height', canvasSize);
-    outputCanvas.setAttribute('width', canvasSize);
-    outputCanvas.setAttribute('height', canvasSize);
+    inputCanvas.setAttribute('width', strCanvasSize);
+    inputCanvas.setAttribute('height', strCanvasSize);
+    outputCanvas.setAttribute('width', strCanvasSize);
+    outputCanvas.setAttribute('height', strCanvasSize);
 
     const inputContext = inputCanvas.getContext('2d');
     const outputContext = outputCanvas.getContext('2d');
 
-    function drawBipolarVector(vector, isInput = true) {
-        if (vector.length !== Math.pow(alphaPixelsInDimension, 2)) return;
-        vector.forEach((el, index) => drawAlphaPixel(index, el === 1, isInput));
+    function getVector(vector, isInput = true) {
+        if (vector.length !== Math.pow(pixelsInDimension, 2)) return;
+        vector.forEach((el, index) => drawPixel(index, el === 1, isInput));
     }
 
-    function getAlphaPixelOrigin(index, size = alphaPixelSize) {
-        const alphaPixelInColumnIndex = index % alphaPixelsInDimension;
-        const alphaPixelInRowIndex = Math.floor(index / alphaPixelsInDimension);
+    function getPixelOrigin(index, size = pixelSize) {
+        const pixelInColumnIndex = index % pixelsInDimension;
+        const pixelInRowIndex = Math.floor(index / pixelsInDimension);
         return {
-            x: alphaPixelInColumnIndex * size,
-            y: alphaPixelInRowIndex * size
+            x: pixelInColumnIndex * size,
+            y: pixelInRowIndex * size
         };
     }
 
-    function drawAlphaPixel(index, isWhite, isInput = true) {
+    function drawPixel(index, isWhite, isInput = true) {
         const ctx = (isInput ? inputContext : outputContext);
-        const imageData = ctx.createImageData(alphaPixelSize, alphaPixelSize);
-        for (let i = 0; i < Math.pow(alphaPixelSize, 2); i++) {
+        const imageData = ctx.createImageData(pixelSize, pixelSize);
+        for (let i = 0; i < Math.pow(pixelSize, 2); i++) {
             const colorValue = isWhite ? 255 : 0;
             imageData.data[i * 4] = colorValue;
             imageData.data[i * 4 + 1] = colorValue;
             imageData.data[i * 4 + 2] = colorValue;
             imageData.data[i * 4 + 3] = 255;
         }
-        const origin = getAlphaPixelOrigin(index);
+        const origin = getPixelOrigin(index);
         ctx.putImageData(imageData, origin.x, origin.y);
     }
 
     return {
-        drawBipolarVector
+        getVector
     }
 })();
 
-const hopfieldNetworkModule = (function() {
+const hammingNetworkModule = (function() {
     const activationFunction = Math.tanh;
     const inputElementsQuantity = inputVectorSize;
     const weightMatrixDimension = inputElementsQuantity;
 
-    let rememberedVectors;
+    let vectorInANetwork;
     let weightMatrix;
 
     function init() {
-        rememberedVectors = [];
-        weightMatrix = matrixModule.getRandomMatrix(weightMatrixDimension, weightMatrixDimension);
+        vectorInANetwork = [];
+        weightMatrix = matrixModule.getRandMatrix(weightMatrixDimension, weightMatrixDimension);
     }
 
     function getNetworkOutput(inputVector) {
@@ -265,16 +260,16 @@ const hopfieldNetworkModule = (function() {
     }
 
     function addVectorToMemory(vector) {
-        rememberedVectors.push(vector);
+        vectorInANetwork.push(vector);
     }
 
     function learningStep() {
-        if (!rememberedVectors.length) return;
-        const X = matrixModule.transposeMatrix(rememberedVectors);
-        const Xtransposed = matrixModule.transposeMatrix(X);
-        const middleTerm = matrixModule.getMatrixInverse(matrixModule.multiplyMatrices(Xtransposed, X));
+        if (!vectorInANetwork.length) return;
+        const X = matrixModule.transposingMatrix(vectorInANetwork);
+        const Xtransposed = matrixModule.transposingMatrix(X);
+        const middleTerm = matrixModule.inverseMatrix(matrixModule.multiplyMatrices(Xtransposed, X));
         weightMatrix = matrixModule.multiplyMatrices(matrixModule.multiplyMatrices(X, middleTerm), Xtransposed);
-        console.log(rememberedVectors);
+        console.log(vectorInANetwork);
         console.log(weightMatrix);
     }
 
@@ -282,8 +277,8 @@ const hopfieldNetworkModule = (function() {
         return value >= 0 ? -1 : 1;
     }
 
-    function checkIfVectorAlreadyRemembered(vector) {
-        return rememberedVectors.some(rememberedVector => rememberedVector.every((el, index) => el === vector[index]));
+    function checkVectorAlreadyInANetwork(vector) {
+        return vectorInANetwork.some(rememberedVector => rememberedVector.every((el, index) => el === vector[index]));
     }
 
     return {
@@ -291,7 +286,7 @@ const hopfieldNetworkModule = (function() {
         getNetworkOutput,
         addVectorToMemory,
         learningStep,
-        checkIfVectorAlreadyRemembered
+        checkVectorAlreadyInANetwork
     }
 })();
 
@@ -306,7 +301,7 @@ const fileReaderModule = (function() {
                 if (currVector.length !== inputVectorSize) {
                     throw `Invalid input vector size: wanted ${inputVectorSize}, got ${currVector.length}`;
                 }
-                canvasModule.drawBipolarVector(currVector);
+                canvasModule.getVector(currVector);
             }
             reader.readAsText(this.files[0]);
         }
@@ -329,27 +324,27 @@ const fileReaderModule = (function() {
 })();
 
 document.getElementById('convert').addEventListener('click', () => {
-    canvasModule.drawBipolarVector(hopfieldNetworkModule.getNetworkOutput([fileReaderModule.getCurrVector()])[0], false);
+    canvasModule.getVector(hammingNetworkModule.getNetworkOutput([fileReaderModule.getCurrVector()])[0], false);
 });
 
 document.getElementById('save-for-learning').addEventListener('click', () => {
     const currVector = fileReaderModule.getCurrVector();
     if (!currVector) return;
-    if (hopfieldNetworkModule.checkIfVectorAlreadyRemembered(currVector)) {
+    if (hammingNetworkModule.checkVectorAlreadyInANetwork(currVector)) {
         alert("this vector is already saved for learning");
         return;
     }
-    hopfieldNetworkModule.addVectorToMemory(currVector);
+    hammingNetworkModule.addVectorToMemory(currVector);
     alert('saved!');
 });
 
 document.getElementById('learning-step').addEventListener('click', () => {
-    hopfieldNetworkModule.learningStep();
+    hammingNetworkModule.learningStep();
     alert('finished!');
 });
 
 document.getElementById('reset').addEventListener('click', () => {
-    hopfieldNetworkModule.init();
+    hammingNetworkModule.init();
 });
 
-hopfieldNetworkModule.init();
+hammingNetworkModule.init();
