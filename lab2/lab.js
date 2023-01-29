@@ -1,19 +1,9 @@
-const matrixModule = (() => {
+const mathModule = (() => {
     function matrixMultiply(A, B)
     {
         const rowsA = A.length, columnsA = A[0].length,
             rowsB = B.length, columnsB = B[0].length,
             C = [];
-
-        try {
-            if (columnsA !== rowsB) {
-                throw `Invalid matrix size; A length = ${A[0].length}, B height = ${B.length}`;
-            }
-        }
-        catch(err) {
-            throw err;
-        }
-
         for (let i = 0; i < rowsA; i++) C[i] = [];
         for (let k = 0; k < columnsB; k++) {
             for (let i = 0; i < rowsA; i++) {
@@ -34,36 +24,6 @@ const matrixModule = (() => {
             }
         }
         return transposed;
-    }
-
-    function differenceMatrices(matrix1, matrix2) {
-        const result = [];
-        const height = matrix1.length;
-        const width = matrix1[0].length;
-        for (let i = 0; i < height; i++) {
-            result.push(new Array(width));
-            for(let j = 0; j < width; j++) {
-                result[i][j] = matrix1[i][j] - matrix2[i][j];
-            }
-        }
-        return result;
-    }
-
-    function normalizeByRow(weightMatrix) {
-        weightMatrix.forEach((row, index) => normalizeRow(weightMatrix, index));
-    }
-
-    function normalizeByColumn(weightMatrix) {
-        for(let j = 0; j < weightMatrix[0].length; j++) {
-            let columnSum = 0;
-            for(let i = 0; i < weightMatrix.length; i++) {
-                columnSum += Math.pow(weightMatrix[i][j], 2);
-            }
-            const modulus = Math.sqrt(columnSum);
-            for(let i = 0; i < weightMatrix.length; i++) {
-                weightMatrix[i][j] /= modulus;
-            }
-        }
     }
 
     function multiplyMatrixByNumber(matrix, number) {
@@ -100,9 +60,6 @@ const matrixModule = (() => {
 
     function calculateDet(matrix) {
         try {
-            if (matrix.length !== matrix[0].length) {
-                throw "Non-square matrix passed to the calculateDet function";
-            }
             if (matrix.length === 1) {
                 return matrix[0][0];
             }
@@ -116,8 +73,8 @@ const matrixModule = (() => {
                 return determinant;
             }
         }
-        catch(err) {
-            console.error(err);
+        catch(error) {
+            console.error(error);
         }
     }
 
@@ -131,7 +88,7 @@ const matrixModule = (() => {
             }
             newMatrix.push([]);
             for (let column = 0; column < matrix[0].length; column++) {
-                if (column == j) {
+                if (column === j) {
                     continue;
                 }
                 newMatrix[row - skippedRow].push(matrix[row][column]);
@@ -140,17 +97,6 @@ const matrixModule = (() => {
         return newMatrix;
     }
 
-    function areVectorsLinearlyIndependent(vectors) {
-        for (let i = 0; i < vectors.length; i++) {
-            const currFirstComparedVector = vectors[i];
-            for (let j = i + 1; j < vectors.length; j++) {
-                const currSecondComparedVector = vectors[j];
-                const currRatio = currFirstComparedVector[0] / currSecondComparedVector[0];
-                if (currFirstComparedVector.some((el, index) => el / currSecondComparedVector[index] !== currRatio)) return true;
-            }
-        }
-        return false;
-    }
 
     function getRandMatrix(height, width, zeroedMainDiagonal = true, bottomClamp = -1, topClamp = 1) {
         const matrix = new Array(height).fill().map(el => new Array(width));
@@ -177,27 +123,22 @@ const matrixModule = (() => {
     return {
         matrixMultiply,
         transposingMatrix,
-        differenceMatrices,
-        normalizeByRow,
-        normalizeByColumn,
-        multiplyMatrixByNumber,
         inverseMatrix,
-        areVectorsLinearlyIndependent,
         getRandMatrix,
         applyFunctionToMatrixElements,
-        calculateDet
     }
 })();
 
-const inputVectorSize = 900;
+const inputVectorSize = 30 * 30;
 
 const canvasModule = (function() {
-    const pixelsInDimension = Math.floor(Math.sqrt(inputVectorSize));
+    const pixelsInRow = Math.floor(Math.sqrt(inputVectorSize));
     const pixelSize = 8;
-    const canvasSize = pixelSize * pixelsInDimension;
+    const canvasSize = pixelSize * pixelsInRow;
     const strCanvasSize = canvasSize.toString();
     const inputCanvas = document.getElementById('input');
     const outputCanvas = document.getElementById('output');
+    const maxValue = 255;
     inputCanvas.setAttribute('width', strCanvasSize);
     inputCanvas.setAttribute('height', strCanvasSize);
     outputCanvas.setAttribute('width', strCanvasSize);
@@ -207,13 +148,13 @@ const canvasModule = (function() {
     const outputContext = outputCanvas.getContext('2d');
 
     function getVector(vector, isInput = true) {
-        if (vector.length !== Math.pow(pixelsInDimension, 2)) return;
+        if (vector.length !== Math.pow(pixelsInRow, 2)) return;
         vector.forEach((el, index) => drawPixel(index, el === 1, isInput));
     }
 
     function getPixelOrigin(index, size = pixelSize) {
-        const pixelInColumnIndex = index % pixelsInDimension;
-        const pixelInRowIndex = Math.floor(index / pixelsInDimension);
+        const pixelInColumnIndex = index % pixelsInRow;
+        const pixelInRowIndex = Math.floor(index / pixelsInRow);
         return {
             x: pixelInColumnIndex * size,
             y: pixelInRowIndex * size
@@ -223,12 +164,12 @@ const canvasModule = (function() {
     function drawPixel(index, isWhite, isInput = true) {
         const ctx = (isInput ? inputContext : outputContext);
         const imageData = ctx.createImageData(pixelSize, pixelSize);
-        for (let i = 0; i < Math.pow(pixelSize, 2); i++) {
-            const colorValue = isWhite ? 255 : 0;
-            imageData.data[i * 4] = colorValue;
-            imageData.data[i * 4 + 1] = colorValue;
-            imageData.data[i * 4 + 2] = colorValue;
-            imageData.data[i * 4 + 3] = 255;
+        for (let pixByTwo = 0; pixByTwo < Math.pow(pixelSize, 2); pixByTwo++) {
+            const colorValue = isWhite ? maxValue : 0;
+            imageData.data[pixByTwo * 4] = colorValue;
+            imageData.data[pixByTwo * 4 + 1] = colorValue;
+            imageData.data[pixByTwo * 4 + 2] = colorValue;
+            imageData.data[pixByTwo * 4 + 3] = maxValue;
         }
         const origin = getPixelOrigin(index);
         ctx.putImageData(imageData, origin.x, origin.y);
@@ -241,21 +182,20 @@ const canvasModule = (function() {
 
 const hammingNetworkModule = (function() {
     const activationFunction = Math.tanh;
-    const inputElementsQuantity = inputVectorSize;
-    const weightMatrixDimension = inputElementsQuantity;
+    const weightMatrixInARow = inputVectorSize;
 
     let vectorInANetwork;
     let weightMatrix;
 
     function init() {
         vectorInANetwork = [];
-        weightMatrix = matrixModule.getRandMatrix(weightMatrixDimension, weightMatrixDimension);
+        weightMatrix = mathModule.getRandMatrix(weightMatrixInARow, weightMatrixInARow);
     }
 
     function getNetworkOutput(inputVector) {
-        const output = matrixModule.matrixMultiply(inputVector, weightMatrix);
-        const outputWithActivationFunction = matrixModule.applyFunctionToMatrixElements(output, activationFunction);
-        const outputWithReducer = matrixModule.applyFunctionToMatrixElements(outputWithActivationFunction, valueReducer);
+        const output = mathModule.matrixMultiply(inputVector, weightMatrix);
+        const outputWithActivationFunction = mathModule.applyFunctionToMatrixElements(output, activationFunction);
+        const outputWithReducer = mathModule.applyFunctionToMatrixElements(outputWithActivationFunction, valueReducer);
         return outputWithReducer;
     }
 
@@ -265,10 +205,10 @@ const hammingNetworkModule = (function() {
 
     function learningStep() {
         if (!vectorInANetwork.length) return;
-        const X = matrixModule.transposingMatrix(vectorInANetwork);
-        const Xtranspose = matrixModule.transposingMatrix(X);
-        const middleTerm = matrixModule.inverseMatrix(matrixModule.matrixMultiply(Xtranspose, X));
-        weightMatrix = matrixModule.matrixMultiply(matrixModule.matrixMultiply(X, middleTerm), Xtranspose);
+        const XTransposingOnce = mathModule.transposingMatrix(vectorInANetwork);
+        const XTransposingTwice = mathModule.transposingMatrix(XTransposingOnce);
+        const middleTerm = mathModule.inverseMatrix(mathModule.matrixMultiply(XTransposingTwice, XTransposingOnce));
+        weightMatrix = mathModule.matrixMultiply(mathModule.matrixMultiply(XTransposingOnce, middleTerm), XTransposingTwice);
         console.log(vectorInANetwork);
         console.log(weightMatrix);
     }
@@ -277,20 +217,15 @@ const hammingNetworkModule = (function() {
         return value >= 0 ? -1 : 1;
     }
 
-    function checkVectorAlreadyInANetwork(vector) {
-        return vectorInANetwork.some(rememberedVector => rememberedVector.every((el, index) => el === vector[index]));
-    }
-
     return {
         init,
         getNetworkOutput,
         addVectorToMemory,
         learningStep,
-        checkVectorAlreadyInANetwork
     }
 })();
 
-const fileReaderModule = (function() {
+const inputVectorReaderModule = (function() {
     let currV;
 
     document.getElementById('text-file-input').addEventListener('change', function() {
@@ -298,15 +233,12 @@ const fileReaderModule = (function() {
             const reader = new FileReader();
             reader.onload = () => {
                 currV = convertStringToVector(reader.result);
-                if (currV.length !== inputVectorSize) {
-                    throw `Invalid input vector size: wanted ${inputVectorSize}, got ${currV.length}`;
-                }
                 canvasModule.getVector(currV);
             }
             reader.readAsText(this.files[0]);
         }
-        catch(err) {
-            console.error(err);
+        catch(error) {
+            console.error(error);
         }
     });
 
@@ -321,19 +253,16 @@ const fileReaderModule = (function() {
     return {
         getCurrV
     }
+
 })();
 
 document.getElementById('convert').addEventListener('click', () => {
-    canvasModule.getVector(hammingNetworkModule.getNetworkOutput([fileReaderModule.getCurrV()])[0], false);
+    canvasModule.getVector(hammingNetworkModule.getNetworkOutput([inputVectorReaderModule.getCurrV()])[0], false);
 });
 
 document.getElementById('save-for-learning').addEventListener('click', () => {
-    const currV = fileReaderModule.getCurrV();
+    const currV = inputVectorReaderModule.getCurrV();
     if (!currV) return;
-    if (hammingNetworkModule.checkVectorAlreadyInANetwork(currV)) {
-        alert("this vector is already saved for learning");
-        return;
-    }
     hammingNetworkModule.addVectorToMemory(currV);
     alert('saved!');
 });
