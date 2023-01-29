@@ -1,19 +1,9 @@
-const matrixModule = (() => {
+const mathModule = (() => {
     function matrixMultiply(A, B)
     {
-        const rowsA = A.length, columnsA = A[0].length,
+        const rowsA = A.length,
             rowsB = B.length, columnsB = B[0].length,
             C = [];
-
-        try {
-            if (columnsA !== rowsB) {
-                throw `Invalid matrix size; A length = ${A[0].length}, B height = ${B.length}`;
-            }
-        }
-        catch(err) {
-            throw err;
-        }
-
         for (let i = 0; i < rowsA; i++) C[i] = [];
         for (let k = 0; k < columnsB; k++) {
             for (let i = 0; i < rowsA; i++) {
@@ -49,41 +39,12 @@ const matrixModule = (() => {
         return newMatrix;
     }
 
-    function normalizeRow(matrix, indexRow) {
-        const modulus = Math.sqrt(matrix[indexRow].map(el => el * el).reduce((r, v) => r + v, 0));
-        for(let j = 0; j < matrix[indexRow].length; j++) {
-            matrix[indexRow][j] /= modulus;
-        }
-    }
-
-    function ignoreIthRowAndJthColumn(matrix, i, j) {
-        const newMatrix = [];
-        let skippedRow = false;
-        for (let row = 0; row < matrix.length; row++) {
-            if (row === i) {
-                skippedRow = true;
-                continue;
-            }
-            newMatrix.push([]);
-            for (let column = 0; column < matrix[0].length; column++) {
-                if (column == j) {
-                    continue;
-                }
-                newMatrix[row - skippedRow].push(matrix[row][column]);
-            }
-        }
-        return newMatrix;
-    }
-
-    function getRandMatrix(height, width, nullificateMainDiagonal = true, bottomClamp = -1, topClamp = 1) {
+    function getRandMatrix(height, width) {
+        const bottomLine = -1, topLine = 1;
         const matrix = new Array(height).fill().map(el => new Array(width));
         for (let i = 0; i < height; i++) {
             for (let j = 0; j < width; j++) {
-                if (nullificateMainDiagonal && i === j) {
-                    matrix[i][j] = 0;
-                    continue;
-                }
-                matrix[i][j] = randNumberInRange(bottomClamp, topClamp);
+                matrix[i][j] = randNumberInRange(bottomLine, topLine);
             }
         }
         return matrix;
@@ -93,7 +54,7 @@ const matrixModule = (() => {
         return (rightBound - leftBound) * Math.random() + leftBound;
     }
 
-    function applyFunctionToMatrixElements(matrix, func) {
+    function functionValuesToMatrixElems(matrix, func) {
         return matrix.map(row => row.map(el => func(el)));
     }
 
@@ -103,103 +64,98 @@ const matrixModule = (() => {
     return {
         matrixMultiply,
         getRandMatrix,
-        applyFunctionToMatrixElements,
+        functionValuesToMatrixElems,
         sumMatrix
     }
 })();
 
-const lrluNetworkModule = (() => {
+const leakyReLUModule = (() => {
     const contextNeuronActivationFunction = Math.asinh;
     const hiddenNeuronActivationFunction = (arg) => arg;
     const outputNeuronActivationFunction = (arg) => arg;
-    const hiddenNeuronActivationFunctionDerivative = (arg) => 1;
-    const inputNeuronsQuantity = 5;
-    const hiddenNeuronsQuantity = 1;
-    const outputNeuronsQuantity = 1;
-    const contextNeuronsQuantity = outputNeuronsQuantity;
+    const hiddenNeuronActivationDerivativeFunction = (arg) => 1;
+    const inputLayerNeuronsQuantity = 5;
+    const hiddenLayerNeuronsQuantity = 1;
+    const outputLayerNeuronsQuantity = 1;
+    const contextNeuronsQuantity = outputLayerNeuronsQuantity;
     const weights = {};
     let learningParameters = {}
-    let currContextNeuronsValues;
-
+    let currentNotHiddenNeuronsValues;
     let initialized = false;
     let predictedOnce = false;
 
     function init() {
-        weights.inputToHidden = matrixModule.getRandMatrix(inputNeuronsQuantity, hiddenNeuronsQuantity, false);
-        weights.hiddenOut = matrixModule.getRandMatrix(hiddenNeuronsQuantity, outputNeuronsQuantity, false);
-        weights.contextToHidden = matrixModule.getRandMatrix(contextNeuronsQuantity, hiddenNeuronsQuantity, false);
+        weights.inputToHidden = mathModule.getRandMatrix(inputLayerNeuronsQuantity, hiddenLayerNeuronsQuantity);
+        weights.hiddenLayer = mathModule.getRandMatrix(hiddenLayerNeuronsQuantity, outputLayerNeuronsQuantity);
+        weights.noHiddenToHidden = mathModule.getRandMatrix(contextNeuronsQuantity, hiddenLayerNeuronsQuantity);
         learningParameters = {
             currentError: 0,
-            hiddenLayerPrejudices: new Array(hiddenNeuronsQuantity).fill(0),
+            hiddenLayerPrejudices: new Array(hiddenLayerNeuronsQuantity).fill(0),
             maxError: Number(prompt('Input max error:')),
             learningCoef: Number(prompt('Input learning coefficient'))
         }
-        currContextNeuronsValues = [new Array(contextNeuronsQuantity).fill(0)];
+        currentNotHiddenNeuronsValues = [new Array(contextNeuronsQuantity).fill(0)];
         initialized = true;
     }
 
-    function calculateNetworkOutput(inputValues, ethaloneValue) {
+    function calculateNetworkOutput(inputValues, standardValue) {
+        const input = inputValues ?? [prompt('Input 5 numbers').trim().split(' ').map(el => Number(el))];
+        const standard = standardValue ?? Number(prompt('Input 6th expected value'));
+        learningParameters.initSequence = input;
+        learningParameters.currStandard = standard;
 
-
-        const input = inputValues ?? [prompt('Input sequence (5 numbers, delimit by space)').trim().split(' ').map(el => Number(el))];
-        const ethalone = ethaloneValue ?? Number(prompt('Input ethalone (1 number)'));
-        learningParameters.currentIn = input;
-        learningParameters.currEthalone = ethalone;
-
-        const hiddenNeuronValues =  matrixModule.sumMatrix(
-            matrixModule.matrixMultiply(input, weights.inputToHidden),
-            matrixModule.matrixMultiply(currContextNeuronsValues, weights.contextToHidden)
+        const hiddenLayerNeuronValues =  mathModule.sumMatrix(
+            mathModule.matrixMultiply(input, weights.inputToHidden),
+            mathModule.matrixMultiply(currentNotHiddenNeuronsValues, weights.noHiddenToHidden)
         ).map((row, indexRow) => row.map(el => hiddenNeuronActivationFunction(el, learningParameters.hiddenLayerPrejudices[indexRow])));
-        const outputNeuronValues = matrixModule.applyFunctionToMatrixElements(
-            matrixModule.matrixMultiply(
-                hiddenNeuronValues,
-                weights.hiddenOut
+        const outputLayerNeuronValues = mathModule.functionValuesToMatrixElems(
+            mathModule.matrixMultiply(
+                hiddenLayerNeuronValues,
+                weights.hiddenLayer
             ),
             outputNeuronActivationFunction
         );
-        currContextNeuronsValues = matrixModule.applyFunctionToMatrixElements(
-            outputNeuronValues,
+        currentNotHiddenNeuronsValues = mathModule.functionValuesToMatrixElems(
+            outputLayerNeuronValues,
             contextNeuronActivationFunction
         );
 
-        learningParameters.hiddenNeuronValues = hiddenNeuronValues;
-        learningParameters.outputNeuronValues = outputNeuronValues;
-        learningParameters.currentError = outputNeuronValues[0][0] - ethalone;
+        learningParameters.hiddenLayerNeuronValues = hiddenLayerNeuronValues;
+        learningParameters.outputLayerNeuronValues = outputLayerNeuronValues;
+        learningParameters.currentError = outputLayerNeuronValues[0][0] - standard;
         predictedOnce = true;
-        console.log(outputNeuronValues[0][0]);
+        console.log(outputLayerNeuronValues[0][0]);
     }
 
     function learn() {
         while (Math.abs(learningParameters.currentError) > learningParameters.maxError) {
             tuneWeights();
             tunePrejudices(learningParameters.differencingCoef);
-            calculateNetworkOutput(learningParameters.currentIn, learningParameters.currEthalone);
-        };
+            calculateNetworkOutput(learningParameters.initSequence, learningParameters.currStandard);
+        }
     }
 
     function tuneWeights() {
-        weights.hiddenOut = weights.hiddenOut.map((row, indexRow) => {
-            const differencing = learningParameters.learningCoef * learningParameters.currentError * learningParameters.hiddenNeuronValues[indexRow][0];
+        weights.hiddenLayer = weights.hiddenLayer.map((row, indexRow) => {
+            const differencing = learningParameters.learningCoef * learningParameters.currentError * learningParameters.hiddenLayerNeuronValues[indexRow][0];
             return row.map(el => el - differencing);
         });
 
-        learningParameters.differencingCoef = learningParameters.hiddenNeuronValues.map((row, indexRow) =>
-            learningParameters.learningCoef
-            * ithGamma(learningParameters.currentError, indexRow)
-            * hiddenNeuronActivationFunctionDerivative(row[0])
+        learningParameters.differencingCoef = learningParameters.hiddenLayerNeuronValues.map((row, indexRow) =>
+            learningParameters.learningCoef * ithGamma(learningParameters.currentError, indexRow) * hiddenNeuronActivationDerivativeFunction(row[0])
         );
 
         const differencingCoef = learningParameters.differencingCoef;
 
         for (let k = 0; k < weights.inputToHidden.length; k++) {
             for (let i = 0; i < differencingCoef.length; i++) {
-                weights.inputToHidden[k][i] -= differencingCoef[i] * learningParameters.currentIn[0][k];
+                weights.inputToHidden[k][i] -= differencingCoef[i] * learningParameters.initSequence[0][k];
             }
         }
 
-        for (let l = 0; l < weights.contextToHidden.length; l++) {
+        for (let l = 0; l < weights.noHiddenToHidden.length; l++) {
             for (let i = 0; i < differencingCoef.length; i++) {
-                weights.contextToHidden[l][i] -= differencingCoef[i] * learningParameters.hiddenNeuronValues[i][0];
+                weights.noHiddenToHidden[l][i] -= differencingCoef[i] * learningParameters.hiddenLayerNeuronValues[i][0];
             }
         }
     }
@@ -209,7 +165,7 @@ const lrluNetworkModule = (() => {
     }
 
     function ithGamma(currentError, index) {
-        return currentError * weights.hiddenOut[index][0];
+        return currentError * weights.hiddenLayer[index][0];
     }
 
     function isInitialized() {
@@ -230,25 +186,25 @@ const lrluNetworkModule = (() => {
 })();
 
 document.getElementById('init-reset').addEventListener('click', () => {
-    lrluNetworkModule.init();
+    leakyReLUModule.init();
 });
 
 document.getElementById('predict').addEventListener('click', () => {
-    if (!lrluNetworkModule.isInitialized()) {
-        alert('network not yet initialized');
+    if (!leakyReLUModule.isInitialized()) {
+        alert('Network is not initialized!');
         return;
     }
-    lrluNetworkModule.calculateNetworkOutput();
+    leakyReLUModule.calculateNetworkOutput();
 });
 
 document.getElementById('learn').addEventListener('click', () => {
-    if (!lrluNetworkModule.isInitialized()) {
-        alert('network not yet initialized');
+    if (!leakyReLUModule.isInitialized()) {
+        alert('Network is not initialized!');
         return;
     }
-    if (!lrluNetworkModule.predicted()) {
-        alert('you need to predict at least once before learning');
+    if (!leakyReLUModule.predicted()) {
+        alert('You need to predict at least once before learning');
         return;
     }
-    lrluNetworkModule.learn();
+    leakyReLUModule.learn();
 });
