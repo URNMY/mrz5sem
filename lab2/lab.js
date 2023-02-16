@@ -1,8 +1,7 @@
 const mathModule = (() => {
     function matrixMultiply(A, B)
     {
-        const rowsA = A.length, columnsA = A[0].length,
-            rowsB = B.length, columnsB = B[0].length,
+        const rowsA = A.length, rowsB = B.length, columnsB = B[0].length,
             C = [];
         for (let i = 0; i < rowsA; i++) C[i] = [];
         for (let k = 0; k < columnsB; k++) {
@@ -36,13 +35,6 @@ const mathModule = (() => {
         return newMatrix;
     }
 
-    function normalizeRow(matrix, indexRow) {
-        const modulus = Math.sqrt(matrix[indexRow].map(el => el * el).reduce((r, v) => r + v, 0));
-        for(let j = 0; j < matrix[indexRow].length; j++) {
-            matrix[indexRow][j] /= modulus;
-        }
-    }
-
     function inverseMatrix(matrix) {
         const determinant = calculateDet(matrix);
         const transposed = transposingMatrix(matrix);
@@ -50,14 +42,13 @@ const mathModule = (() => {
         const inverseWidth = matrix.length;
         for (let i = 0; i < inverseHeight; i++) {
             for (let j = 0; j < inverseWidth; j++) {
-                if ((i + j) % 2 === 0) {
-                    transposed[i][j] = -transposed[i][j];
+                if ((i + j) && 1 === 0) {
+                    transposed[i][j] *= -1;
                 }
             }
         }
         return multiplyMatrixByNumber(transposed, 1 / determinant);
     }
-
     function calculateDet(matrix) {
         try {
             if (matrix.length === 1) {
@@ -67,7 +58,7 @@ const mathModule = (() => {
                 let determinant = 0;
                 for (let column = 0; column < matrix[0].length; column++) {
                     const currMultiplier = matrix[0][column];
-                    const sign = column % 2 === 0 ? 1 : -1;
+                    const sign = column && 1 === 0 ? 1 : -1;
                     determinant += calculateDet(ignoreIthRowAndJthColumn(matrix, 0, column)) * currMultiplier * sign;
                 }
                 return determinant;
@@ -98,26 +89,18 @@ const mathModule = (() => {
     }
 
 
-    function getRandMatrix(height, width, zeroedMainDiagonal = true, bottomClamp = -1, topClamp = 1) {
+    function getRandMatrix(height, width, revokeMainDiagonal = true, bottomClamp = -1, topClamp = 1) {
         const matrix = new Array(height).fill().map(el => new Array(width));
         for (let i = 0; i < height; i++) {
             for (let j = 0; j < width; j++) {
-                if (zeroedMainDiagonal && i === j) {
+                if (revokeMainDiagonal && i === j) {
                     matrix[i][j] = 0;
                     continue;
                 }
-                matrix[i][j] = randNumberInRange(bottomClamp, topClamp);
+                matrix[i][j] = (topClamp - bottomClamp) * Math.random() + bottomClamp;
             }
         }
         return matrix;
-    }
-
-    function randNumberInRange(leftBound, rightBound) {
-        return (rightBound - leftBound) * Math.random() + leftBound;
-    }
-
-    function applyFunctionToMatrixElements(matrix, func) {
-        return matrix.map(row => row.map(el => func(el)));
     }
 
     return {
@@ -125,7 +108,6 @@ const mathModule = (() => {
         transposingMatrix,
         inverseMatrix,
         getRandMatrix,
-        applyFunctionToMatrixElements,
     }
 })();
 
@@ -185,18 +167,17 @@ const hammingNetworkModule = (function() {
     const weightMatrixInARow = inputVectorSize;
 
     let vectorInANetwork;
-    let weightMatrix;
+    let newMatrixWeight;
 
     function init() {
         vectorInANetwork = [];
-        weightMatrix = mathModule.getRandMatrix(weightMatrixInARow, weightMatrixInARow);
+        newMatrixWeight = mathModule.getRandMatrix(weightMatrixInARow, weightMatrixInARow);
     }
 
     function getNetworkOutput(inputVector) {
-        const output = mathModule.matrixMultiply(inputVector, weightMatrix);
-        const outputWithActivationFunction = mathModule.applyFunctionToMatrixElements(output, activationFunction);
-        const outputWithReducer = mathModule.applyFunctionToMatrixElements(outputWithActivationFunction, valueReducer);
-        return outputWithReducer;
+        const outputMatrixWithNewWeights = mathModule.matrixMultiply(inputVector, newMatrixWeight);
+        const outputWithActivationFunction = outputMatrixWithNewWeights.map(row => row.map(el => activationFunction(el)));
+        return outputWithActivationFunction.map(row => row.map(el => valueReducer(el)));
     }
 
     function addVectorToMemory(vector) {
@@ -205,12 +186,12 @@ const hammingNetworkModule = (function() {
 
     function learningStep() {
         if (!vectorInANetwork.length) return;
-        const XTransposingOnce = mathModule.transposingMatrix(vectorInANetwork);
-        const XTransposingTwice = mathModule.transposingMatrix(XTransposingOnce);
-        const middleTerm = mathModule.inverseMatrix(mathModule.matrixMultiply(XTransposingTwice, XTransposingOnce));
-        weightMatrix = mathModule.matrixMultiply(mathModule.matrixMultiply(XTransposingOnce, middleTerm), XTransposingTwice);
+        const xTransposingOnce = mathModule.transposingMatrix(vectorInANetwork);
+        const xTransposingTwice = mathModule.transposingMatrix(xTransposingOnce);
+        const inverseOfTwoTransposingMatrices = mathModule.inverseMatrix(mathModule.matrixMultiply(xTransposingTwice, xTransposingOnce));
+        newMatrixWeight = mathModule.matrixMultiply(mathModule.matrixMultiply(xTransposingOnce, inverseOfTwoTransposingMatrices), xTransposingTwice);
         console.log(vectorInANetwork);
-        console.log(weightMatrix);
+        console.log(newMatrixWeight);
     }
 
     function valueReducer(value) {
@@ -256,23 +237,23 @@ const inputVectorReaderModule = (function() {
 
 })();
 
-document.getElementById('convert').addEventListener('click', () => {
+document.getElementById('button-convert').addEventListener('click', () => {
     canvasModule.getVector(hammingNetworkModule.getNetworkOutput([inputVectorReaderModule.getCurrV()])[0], false);
 });
 
-document.getElementById('save-for-learning').addEventListener('click', () => {
+document.getElementById('button-save-for-learning').addEventListener('click', () => {
     const currV = inputVectorReaderModule.getCurrV();
     if (!currV) return;
     hammingNetworkModule.addVectorToMemory(currV);
     alert('saved!');
 });
 
-document.getElementById('learning-step').addEventListener('click', () => {
+document.getElementById('button-learning-step').addEventListener('click', () => {
     hammingNetworkModule.learningStep();
     alert('finished!');
 });
 
-document.getElementById('reset').addEventListener('click', () => {
+document.getElementById('button-reset').addEventListener('click', () => {
     hammingNetworkModule.init();
 });
 
