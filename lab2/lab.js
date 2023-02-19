@@ -1,60 +1,56 @@
-const inputVectorSize = 30 * 30;
-const square = 4;
-const pixelsInRow = Math.floor(Math.sqrt(inputVectorSize));
-const pixelSize = 8;
-const canvasSize = pixelSize * pixelsInRow;
-const strCanvasSize = canvasSize.toString();
-const inputCanvas = document.getElementById('input');
-const outputCanvas = document.getElementById('output');
-const maxValue = 255;
+const inputVectorSize = 30 * 30,
+ square = 4,
+ pixelsInRow = Math.floor(Math.sqrt(inputVectorSize)),
+ pixelSize = 8,
+    threshold = 0,
+ canvasSize = pixelSize * pixelsInRow,
+ strCanvasSize = canvasSize.toString(),
+ inputCanvas = document.getElementById('input'),
+ outputCanvas = document.getElementById('output'),
+ maxValue = 255,
+inputContext = inputCanvas.getContext('2d'),
+outputContext = outputCanvas.getContext('2d'),
+activationFunction = Math.tanh,
+weightMatrixInARow = inputVectorSize;
 inputCanvas.setAttribute('width', strCanvasSize);
 inputCanvas.setAttribute('height', strCanvasSize);
 outputCanvas.setAttribute('width', strCanvasSize);
 outputCanvas.setAttribute('height', strCanvasSize);
-const inputContext = inputCanvas.getContext('2d');
-const outputContext = outputCanvas.getContext('2d');
-const activationFunction = Math.tanh;
-const weightMatrixInARow = inputVectorSize;
-let vectorInANetwork;
-let newMatrixWeight;
-let currV;
+
+let vectorInANetwork,
+ newMatrixWeight,
+ currV;
 
 init();
 
 function init() {
     vectorInANetwork = [];
-    newMatrixWeight = getRandMatrix(weightMatrixInARow, weightMatrixInARow);
-}
-
-function getRandMatrix(height, width, revokeMainDiagonal = true, bottomClamp = -1, topClamp = 1) {
-    const matrix = new Array(height).fill().map(el => new Array(width));
+    const newMatrixWeight = new Array(weightMatrixInARow).map(el => new Array(weightMatrixInARow)), bottomClamp = -1, topClamp = 1;
     let i = 0;
-    while(i < height) {
+    while(i < weightMatrixInARow) {
         let j = 0;
-        while (j < width) {
-            if (revokeMainDiagonal && i === j) {
-                matrix[i][j] = 0;
+        while (j < weightMatrixInARow) {
+            if (i === j) {
+                newMatrixWeight[i][j] = 0;
                 break;
             }
-            matrix[i][j] = (topClamp - bottomClamp) * Math.random() + bottomClamp;
+            newMatrixWeight[i][j] = (topClamp - bottomClamp) * Math.random() + bottomClamp;
             j++;
         }
         i++;
     }
-    return matrix;
 }
 
 document.getElementById('button-convert').addEventListener('click', () => {
     getVector(getNetworkOutput([currV])[0], false);
 });
 function getVector(vector, isInput = true) {
-    if (vector.length !== Math.pow(pixelsInRow, 2)) return;
     vector.forEach((el, index) => drawPixel(index, el === 1, isInput));
 }
 
 function drawPixel(index, isWhite, isInput = true) {
-    const ctx = (isInput ? inputContext : outputContext);
-    const imageData = ctx.createImageData(pixelSize, pixelSize);
+    const ctx = (isInput ? inputContext : outputContext),
+     imageData = ctx.createImageData(pixelSize, pixelSize);
     let pixByTwo = 0;
     while(pixByTwo < Math.pow(pixelSize, 2)) {
         const colorValue = isWhite ? maxValue : 0;
@@ -68,45 +64,60 @@ function drawPixel(index, isWhite, isInput = true) {
         }
         pixByTwo++;
     }
-    const origin = getPixelOrigin(index);
+    const pixelInColumnIndex = index % pixelsInRow,
+     pixelInRowIndex = Math.floor(index / pixelsInRow),
+     origin = {
+            x: pixelInColumnIndex * pixelSize,
+            y: pixelInRowIndex * pixelSize
+        };
     ctx.putImageData(imageData, origin.x, origin.y);
-}
-
-function getPixelOrigin(index, size = pixelSize) {
-    const pixelInColumnIndex = index % pixelsInRow;
-    const pixelInRowIndex = Math.floor(index / pixelsInRow);
-    return {
-        x: pixelInColumnIndex * size,
-        y: pixelInRowIndex * size
-    };
 }
 
 function getNetworkOutput(inputVector) {
     const outputMatrixWithNewWeights = matrixMultiply(inputVector, newMatrixWeight);
     const outputWithActivationFunction = outputMatrixWithNewWeights.map(row => row.map(el => activationFunction(el)));
-    return outputWithActivationFunction.map(row => row.map(el => el >= 0 ? -1 : 1));
+    return outputWithActivationFunction.map(row => row.map(el => el >= threshold ? -1 : 1));
 }
 
 document.getElementById('button-save-for-learning').addEventListener('click', () => {
-    if (!currV) return;
     vectorInANetwork.push(currV);
     alert('saved!');
 });
 
 document.getElementById('button-learning-step').addEventListener('click', () => {
-    learningStep();
-    alert('finished!');
-});
-
-function learningStep() {
-    if (!vectorInANetwork.length) return;
-    const xTransposingOnce = transposingMatrix(vectorInANetwork);
-    const xTransposingTwice = transposingMatrix(xTransposingOnce);
-    const inverseOfTwoTransposingMatrices = inverseMatrix(matrixMultiply(xTransposingTwice, xTransposingOnce));
+    const xTransposingOnce = transposingMatrix(vectorInANetwork),
+     xTransposingTwice = transposingMatrix(xTransposingOnce),
+     matrixM = matrixMultiply(xTransposingTwice, xTransposingOnce),
+     determinant = calculateDet(matrixM),
+     transposed = transposingMatrix(matrixM),
+     inverseHeight = matrixM[0].length,
+     inverseWidth = matrixM.length;
+    let i = 0;
+    while(i < inverseHeight) {
+        let j = 0;
+        while (j < inverseWidth) {
+            if ((i + j) && 1 === 0) {
+                transposed[i][j] = -transposed[i][j];
+            }
+            j++;
+        }
+        i++;
+    }
+    const inverseOfTwoTransposingMatrices = new Array(transposed.length).map(el => new Array(transposed[0].length));
+    i = 0;
+    while (i < transposed.length){
+        let j = 0;
+        while(j < transposed[0].length){
+            inverseOfTwoTransposingMatrices[i][j] = transposed[i][j] * Math.pow(determinant, -1);
+            j++;
+        }
+        i++;
+    }
     newMatrixWeight = matrixMultiply(matrixMultiply(xTransposingOnce, inverseOfTwoTransposingMatrices), xTransposingTwice);
     console.log(vectorInANetwork);
     console.log(newMatrixWeight);
-}
+    alert('finished!');
+});
 
 function transposingMatrix(matrix) {
     const transposed = [];
@@ -123,38 +134,6 @@ function transposingMatrix(matrix) {
     return transposed;
 }
 
-function inverseMatrix(matrix) {
-    const determinant = calculateDet(matrix);
-    const transposed = transposingMatrix(matrix);
-    const inverseHeight = matrix[0].length;
-    const inverseWidth = matrix.length;
-    let i = 0;
-    while(i < inverseHeight) {
-        let j = 0;
-        while (j < inverseWidth) {
-            if ((i + j) && 1 === 0) {
-                transposed[i][j] *= -1;
-            }
-            j++;
-        }
-        i++;
-    }
-    return multiplyMatrixByNumber(transposed, 1 / determinant);
-}
-
-function multiplyMatrixByNumber(matrix, number) {
-    const newMatrix = new Array(matrix.length).fill().map(el => new Array(matrix[0].length));
-    let i = 0;
-    while (i < matrix.length){
-        let j = 0;
-        while(j < matrix[0].length){
-            newMatrix[i][j] = matrix[i][j] * number;
-            j++;
-        }
-        i++;
-    }
-    return newMatrix;
-}
 function calculateDet(matrix) {
     if (matrix.length === 1) {
         return matrix[0][0];
@@ -163,8 +142,8 @@ function calculateDet(matrix) {
         let determinant = 0, column = 0;
         while(column < matrix[0].length) {
             const currMultiplier = matrix[0][column];
-            const sign = column && 1 === 0 ? 1 : -1;
-            determinant += calculateDet(ignoreIthRowAndJthColumn(matrix, 0, column)) * currMultiplier * sign;
+            const sign = column && 1 === threshold ? 1 : -1;
+            determinant = determinant + calculateDet(ignoreIthRowAndJthColumn(matrix, 0, column)) * currMultiplier * sign;
             column++;
         }
         return determinant;
@@ -206,7 +185,7 @@ function matrixMultiply(A, B)
             let newMatrixCell = 0;
             let j = 0;
             while(j < rowsB) {
-                newMatrixCell += A[i][j]*B[j][k];
+                newMatrixCell = newMatrixCell + A[i][j]*B[j][k];
                 j++;
             }
             C[i][k] = newMatrixCell;
@@ -221,15 +200,11 @@ document.getElementById('button-reset').addEventListener('click', () => {
     init();
 });
 
-document.getElementById('text-file-input').addEventListener('change', function() {
+document.getElementById('input-file').addEventListener('change', function() {
     const reader = new FileReader();
     reader.onload = () => {
-        currV = convertStringToVector(reader.result);
+        currV = reader.result.split('\n').join(' ').split(' ').filter(el => !!el).map(Number);
         getVector(currV);
     }
     reader.readAsText(this.files[0]);
 });
-
-function convertStringToVector(string) {
-    return string.split('\n').join(' ').split(' ').filter(el => !!el).map(Number);
-}
