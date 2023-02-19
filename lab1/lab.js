@@ -1,246 +1,6 @@
-document.getElementById('compress-button').addEventListener('click', () => {
-    try {
-        de_Compress(learningParameters);
-    }
-    catch(err) {
-        alert('DE_COMPRESSING ERROR!');
-        console.error(err);
-    }
-});
-
-function de_Compress(learningParameters) {
-    learningParameters.parameters = [];
-    const weights = learningParameters.currentWeights;
-    for(let imageSquareInColumnIndex = 0; imageSquareInColumnIndex < innerPixelsInOneColumn; imageSquareInColumnIndex++) {
-        for(let imageSquareInRowIndex = 0; imageSquareInRowIndex < innerPixelsInOneRow; imageSquareInRowIndex++) {
-            const innerPicture = getInnerPicture(imageSquareInColumnIndex, imageSquareInRowIndex);
-            const currInput = getNeuralNetworkImageSquareInput(imageSquareInColumnIndex, imageSquareInRowIndex);
-            const secondLayerValues = LinearRecirculationNetwork.multiplyMatrices(currInput, weights[0]);
-            const currOutput = LinearRecirculationNetwork.multiplyMatrices(secondLayerValues, weights[1]);
-            drawImageSquare(
-                currOutput[0].map(ColourValueMapper((colour + 1) * 255 / 2)),
-                compressedImageCtx,
-                innerPicture.x,
-                innerPicture.y
-            )
-            learningParameters.parameters.push({
-                currInput,
-                secondLayerValues,
-                currOutput,
-            });
-        }
-    }
-}
-
-function getInnerPicture(imageSquareInColumnIndex, imageSquareInRowIndex, width = innerBlockWidth, height = innerBlockHeight) {
-    return {
-        x: imageSquareInRowIndex * width,
-        y: imageSquareInColumnIndex * height
-    };
-}
-
-function getNeuralNetworkImageSquareInput(imageSquareInColumnIndex, imageSquareInRowIndex) {
-    const innerPicture = getInnerPicture(imageSquareInColumnIndex, imageSquareInRowIndex);
-    return [getColourValuesAtinnerPicture(innerPicture.x, innerPicture.y)];
-}
-
-function getColourValuesAtinnerPicture(innerPictureX, innerPictureY, width = innerBlockWidth, height = innerBlockHeight) {
-    const colourValues = [];
-    for(let j = innerPictureY; j < innerPictureY + height; j++) {
-        for(let i = innerPictureX; i < innerPictureX + width; i++) {
-            const currentPixelData = ctx.getImageData(i, j, 1, 1).data;
-            colourValues.push(ColourValueMapper(currentPixelData[0]));
-            colourValues.push(ColourValueMapper(currentPixelData[1]));
-            colourValues.push(ColourValueMapper(currentPixelData[2]));
-        }
-    }
-    return colourValues;
-}
-
-function ColourValueMapper(colour) {
-    return (2 * colour / 255) - 1;
-}
-
-const LinearRecirculationNetwork = (() => {
-    function multiplyMatrices(A, B)
-    {
-        const rowsA = A.length, columnsA = A[0].length,
-            rowsB = B.length, columnsB = B[0].length,
-            C = [];
-
-        try {
-            if (columnsA !== rowsB) {
-                throw `Invalid matrix size; A length = ${A[0].length}, B height = ${B.length}`;
-            }
-        }
-        catch(err) {
-            throw err;
-        }
-
-        for (let i = 0; i < rowsA; i++) C[i] = [];
-        for (let k = 0; k < columnsB; k++) {
-            for (let i = 0; i < rowsA; i++) {
-                let newMatrixCell = 0;
-                for (let j = 0; j < rowsB; j++) newMatrixCell += A[i][j]*B[j][k];
-                C[i][k] = newMatrixCell;
-            }
-        }
-        return C;
-    }
-
-    return {
-        multiplyMatrices,
-    }
-})();
-
-function drawImageSquare(colourValues, ctx, innerPictureX, innerPictureY, width = innerBlockWidth, height = innerBlockHeight) {
-    const imageSquareData = ctx.createImageData(width, height);
-    for(let currColourValueIndex = 0, imageDataIndex = 0;
-        currColourValueIndex < colourValues.length;
-        currColourValueIndex += 3, imageDataIndex += 4)
-    {
-        imageSquareData.data[imageDataIndex] = colourValues[currColourValueIndex];
-        imageSquareData.data[imageDataIndex + 1] = colourValues[currColourValueIndex + 1];
-        imageSquareData.data[imageDataIndex + 2] = colourValues[currColourValueIndex + 2];
-        imageSquareData.data[imageDataIndex + 3] = 255;
-    }
-    ctx.putImageData(imageSquareData, innerPictureX, innerPictureY);
-}
-
-document.getElementById('reset-button').addEventListener('click', () => {
-    const secondLayerNeurons = +prompt('Count of neurons on the second layer:');
-    if (!secondLayerNeurons || isNaN(secondLayerNeurons) || secondLayerNeurons % 1 !== 0) return;
-    const errorLimit = +prompt('Error limit:');
-    if (!errorLimit || isNaN(errorLimit)) return;
-
-    const weights = setRandomWeights(secondLayerNeurons);
-    learningParameters.currentWeights = weights;
-    learningParameters.maxErr = errorLimit;
-});
-
-function setRandomWeights(secondLayerNeurons) {
-    const firstWeights = [];
-    for(let i = 0; i < pixelsInImageSquare * valuesInAPixel; i++) {
-        const newRow = [];
-        for(let j = 0; j < secondLayerNeurons; j++) {
-            newRow.push(Math.random() * (Math.random() > 0.5 ? 1 : -1));
-        }
-        firstWeights.push(newRow);
-    }
-    const secondWeights = transposingMatrix(firstWeights);
-    return [firstWeights, secondWeights];
-}
-
-function transposingMatrix(matrix) {
-    const transposing = [];
-    for(let j = 0; j < matrix[0].length; j++) {
-        transposing.push(new Array(matrix.length));
-        for(let i = 0; i < matrix.length; i++) {
-            transposing[j][i] = matrix[i][j];
-        }
-    }
-    return transposing;
-}
-
-document.getElementById('learning-step-button').addEventListener('click', () => {
-    for(let i = 0; i < learningParameters.parameters.length; i++) {
-        tuneWeights(learningParameters.currentWeights, learningParameters.maxErr, learningParameters.parameters[i]);
-    }
-    de_Compress(learningParameters);
-    alert('Done!');
-});
-
-function tuneWeights(weights, maxErr, parameters) {
-    if (!weights || !parameters || !parameters.currInput || !parameters.secondLayerValues || !parameters.currOutput) return;
-    const X = parameters.currInput;
-    let Y = parameters.secondLayerValues;
-    let Xoverlined = parameters.currOutput;
-    let diff = differenceMatrices(Xoverlined, X);
-    let currError;
-    do {
-        let i = 0;
-        const secondLayerValuesTransposing = transposingMatrix(Y);
-        let a = LinearRecirculationNetwork.multiplyMatrices(secondLayerValuesTransposing, diff);
-        let learningCoefficient = 1 / transposingMatrix(secondLayerValuesTransposing)[0].reduce((row, value) => row + value*value, 0);
-        if(!isFinite(learningCoefficient)) return;
-        multiplyMatrixByNumber(a, learningCoefficient);
-        weights[1] = differenceMatrices(weights[1], a);
-        i++;
-        const inputTransposing = transposingMatrix(X);
-        a = LinearRecirculationNetwork.multiplyMatrices(inputTransposing, diff);
-        const b = LinearRecirculationNetwork.multiplyMatrices(a, transposingMatrix(weights[1]));
-        learningCoefficient = 1 / transposingMatrix(inputTransposing)[0].reduce((row, value) => row + value*value, 0)
-        if(!isFinite(learningCoefficient)) return;
-        multiplyMatrixByNumber(b, learningCoefficient);
-        weights[0] = differenceMatrices(weights[0], b);
-        normalizeByRow(weights[1]);
-        normalizeByColumn(weights[0]);
-        Y = LinearRecirculationNetwork.multiplyMatrices(X, weights[0]);
-        Xoverlined = LinearRecirculationNetwork.multiplyMatrices(Y, weights[1]);
-        diff = differenceMatrices(Xoverlined, X);
-        currError = diff[0].reduce((row, value) => row + value*value, 0);
-    }
-    while(currError > maxErr);
-}
-
-function normalizeByRow(weightMatrix) {
-    weightMatrix.forEach((row, index) => normalizeRow(weightMatrix, index));
-}
-
-function normalizeRow(matrix, indexRow) {
-    const modulus = Math.sqrt(matrix[indexRow].map(el => el * el).reduce((row, value) => row + value, 0));
-    for(let j = 0; j < matrix[indexRow].length; j++) {
-        matrix[indexRow][j] /= modulus;
-    }
-}
-
-function normalizeByColumn(weightMatrix) {
-    for(let j = 0; j < weightMatrix[0].length; j++) {
-        let columnSum = 0;
-        for(let i = 0; i < weightMatrix.length; i++) {
-            columnSum += Math.pow(weightMatrix[i][j], 2);
-        }
-        const modulus = Math.sqrt(columnSum);
-        for(let i = 0; i < weightMatrix.length; i++) {
-            weightMatrix[i][j] /= modulus;
-        }
-    }
-}
-function differenceMatrices(A, B) {
-    const result = [];
-    const height = A.length;
-    const width = A[0].length;
-    for (let i = 0; i < height; i++) {
-        result.push(new Array(width));
-        for(let j = 0; j < width; j++) {
-            result[i][j] = A[i][j] - B[i][j];
-        }
-    }
-    return result;
-}
-
-function multiplyMatrixByNumber(matrix, number) {
-    for (let i = 0; i < matrix.length; i++) {
-        for (let j = 0; j < matrix[0].length; j++) {
-            matrix[i][j] *= number;
-        }
-    }
-}
-
-document.getElementById('learning-steps-button').addEventListener('click', () => {
-    const steps = +prompt("Learning steps:");
-    if (!steps || isNaN(steps) || steps <= 0 || steps % 1 !== 0) return;
-    for(let iter = 0; iter < steps; iter++) {
-        for(let i = 0; i < learningParameters.parameters.length; i++) {
-            tuneWeights(learningParameters.currentWeights, learningParameters.maxErr, learningParameters.parameters[i]);
-        }
-        de_Compress(learningParameters);
-    }
-    alert('Done!');
-});
-
-const innerBlockWidth = 2;
-const innerBlockHeight = 2;
+const square = 4;
+const innerBlockWidth = Math.sqrt(square);
+const innerBlockHeight = Math.sqrt(square);
 const pixelsInImageSquare = innerBlockWidth * innerBlockHeight;
 const imageWidth = 256;
 const imageHeight = 256;
@@ -248,7 +8,7 @@ const innerPixelsInOneRow = imageWidth / innerBlockWidth;
 const innerPixelsInOneColumn = imageHeight / innerBlockHeight;
 const valuesInAPixel = 3;
 const learningParameters = {};
-
+const compressedImageCtx = document.getElementById('compressed-image-container').getContext("2d");
 const canvas = document.getElementById("image-container");
 const ctx = canvas.getContext("2d");
 const imageInput = document.getElementById("image-input");
@@ -265,4 +25,262 @@ imageInput.addEventListener("change", function() {
     reader.readAsDataURL(this.files[0]);
 });
 
-const compressedImageCtx = document.getElementById('compressed-image-container').getContext("2d");
+document.getElementById('button-compress').addEventListener('click', () => {
+    try {
+        de_Compress(learningParameters);
+    }
+    catch(err) {
+        alert('DE_COMPRESSING ERROR!');
+        console.error(err);
+    }
+});
+
+function de_Compress(learningParameters) {
+    learningParameters.parameters = [];
+    const weights = learningParameters.currentWeights;
+    let imageSquareInColumnIndex = 0;
+    while(imageSquareInColumnIndex < innerPixelsInOneColumn){
+        let imageSquareInRowIndex = 0;
+        while(imageSquareInRowIndex < innerPixelsInOneRow) {
+            const innerPicture = getInnerPicture(imageSquareInColumnIndex, imageSquareInRowIndex);
+            const currInput = getNeuralNetworkImageSquareInput(imageSquareInColumnIndex, imageSquareInRowIndex);
+            const secondLayerValues = multiplyMatrices(currInput, weights[0]);
+            const currOutput = multiplyMatrices(secondLayerValues, weights[1]);
+            drawImageSquare(
+                currOutput[0].map(((2 * (colour + 1) * 255 / 2) / 255) - 1),
+                compressedImageCtx,
+                innerPicture.x,
+                innerPicture.y
+            )
+            learningParameters.parameters.push({
+                currInput,
+                secondLayerValues,
+                currOutput,
+            });
+            imageSquareInRowIndex++;
+        }
+        imageSquareInColumnIndex++;
+    }
+}
+
+function getInnerPicture(imageSquareInColumnIndex, imageSquareInRowIndex, width = innerBlockWidth, height = innerBlockHeight) {
+    return {
+        x: imageSquareInRowIndex * width,
+        y: imageSquareInColumnIndex * height
+    };
+}
+
+function getNeuralNetworkImageSquareInput(imageSquareInColumnIndex, imageSquareInRowIndex) {
+    const innerPicture = getInnerPicture(imageSquareInColumnIndex, imageSquareInRowIndex);
+    return [getColourValuesATinyPicture(innerPicture.x, innerPicture.y)];
+}
+
+function getColourValuesATinyPicture(innerPictureX, innerPictureY, width = innerBlockWidth, height = innerBlockHeight) {
+    const colourValues = [];
+    let j = innerPictureY;
+    while (j < innerPictureY + height) {
+        let i = innerPictureX;
+        while (i < innerPictureX + width) {
+            const currentPixelData = ctx.getImageData(i, j, 1, 1).data;
+            for (let k = 0; k < square - 1; k++) {
+                colourValues.push((2 * currentPixelData[k] / 255) - 1);
+            }
+            i++;
+        }
+        j++;
+    }
+    return colourValues;
+}
+    function multiplyMatrices(A, B)
+    {
+        const rowsA = A.length, rowsB = B.length, columnsB = B[0].length, C = [];
+        let i = 0;
+        while(i < rowsA) {
+                C[i] = []
+                i++;
+        }
+        let k = 0;
+        while(k < columnsB) {
+            let i = 0;
+            while(i < rowsA){
+                let newMatrixCell = 0;
+                let j = 0;
+                while(j < rowsB) {
+                    newMatrixCell += A[i][j]*B[j][k];
+                    j++;
+                }
+                C[i][k] = newMatrixCell;
+                i++;
+            }
+            k++;
+        }
+        return C;
+    }
+
+function drawImageSquare(colourValues, ctx, innerPictureX, innerPictureY, width = innerBlockWidth, height = innerBlockHeight) {
+    const imageSquareData = ctx.createImageData(width, height), maxValue = 255;
+    let currColourValueIndex = 0, imageDataIndex = 0;
+    while (currColourValueIndex < colourValues.length){
+        for (let i = 0; i < square; i++) {
+            if (i !== square - 1){
+                imageSquareData.data[imageDataIndex + i] = colourValues[currColourValueIndex + i];
+            }
+            else {
+                imageSquareData.data[imageDataIndex + i] = maxValue;
+            }
+        }
+        currColourValueIndex += 3;
+        imageDataIndex += 4;
+    }
+    ctx.putImageData(imageSquareData, innerPictureX, innerPictureY);
+}
+
+document.getElementById('button-reset').addEventListener('click', () => {
+    const secondLayerNeurons = +prompt('Count of neurons on the second layer:');
+    if (!secondLayerNeurons || isNaN(secondLayerNeurons) || secondLayerNeurons % 1 !== 0) return;
+    const errorLimit = +prompt('Error limit:');
+    if (!errorLimit || isNaN(errorLimit)) return;
+    learningParameters.currentWeights = setRandomWeights(secondLayerNeurons);
+    learningParameters.maxErr = errorLimit;
+});
+
+function setRandomWeights(secondLayerNeurons) {
+    const firstWeights = [];
+    let i = 0;
+    while (i < pixelsInImageSquare * valuesInAPixel) {
+        const newRow = [];
+        let j = 0;
+        while (j < secondLayerNeurons) {
+            newRow.push(Math.random() * (Math.random() > 0.5 ? 1 : -1));
+            j++;
+        }
+        firstWeights.push(newRow);
+        i++;
+    }
+    const secondWeights = transposingMatrix(firstWeights);
+    return [firstWeights, secondWeights];
+}
+
+function transposingMatrix(matrix) {
+    const transposing = [];
+    let j = 0;
+    while(j < matrix[0].length) {
+        transposing.push(new Array(matrix.length));
+        let i = 0;
+        while(i < matrix.length){
+            transposing[j][i] = matrix[i][j];
+            i++;
+        }
+        j++;
+    }
+    return transposing;
+}
+
+document.getElementById('button-learning-step').addEventListener('click', () => {
+    let i = 0;
+    while (i < learningParameters.parameters.length) {
+        tuneWeights(learningParameters.currentWeights, learningParameters.maxErr, learningParameters.parameters[i]);
+        i++;
+    }
+    de_Compress(learningParameters);
+    alert('Done!');
+});
+
+function tuneWeights(weights, maxErr, parameters) {
+    if (!weights || !parameters || !parameters.currInput || !parameters.secondLayerValues || !parameters.currOutput) return;
+    const X = parameters.currInput;
+    let Y = parameters.secondLayerValues, XOverlined = parameters.currOutput,
+        diff = differenceMatrices(XOverlined, X), currError = maxErr + 1;
+    while(currError > maxErr) {
+        const secondLayerValuesTransposing = transposingMatrix(Y);
+        const inputTransposing = transposingMatrix(X);
+        let a = multiplyMatrices(secondLayerValuesTransposing, diff);
+        let learningCoefficient = 1 / transposingMatrix(secondLayerValuesTransposing)[0].reduce((row, value) => row + value*value, 0);
+        if(!isFinite(learningCoefficient)) return;
+        multiplyMatrixByNumber(a, learningCoefficient);
+        weights[1] = differenceMatrices(weights[1], a);
+        a = multiplyMatrices(inputTransposing, diff);
+        const b = multiplyMatrices(a, transposingMatrix(weights[1]));
+        learningCoefficient = 1 / transposingMatrix(inputTransposing)[0].reduce((row, value) => row + value*value, 0)
+        if(!isFinite(learningCoefficient)) return;
+        multiplyMatrixByNumber(b, learningCoefficient);
+        weights[0] = differenceMatrices(weights[0], b);
+        weights[1].forEach((row, index) => normalizeRow(weights[1], index));
+        normalizeByColumn(weights[0]);
+        Y = multiplyMatrices(X, weights[0]);
+        XOverlined = multiplyMatrices(Y, weights[1]);
+        diff = differenceMatrices(XOverlined, X);
+        currError = diff[0].reduce((row, value) => row + value*value, 0);
+    }
+}
+
+function normalizeRow(matrix, indexRow) {
+    const modulus = Math.sqrt(matrix[indexRow].map(el => el * el).reduce((row, value) => row + value, 0));
+    let i = 0;
+    while(i < matrix[indexRow].length) {
+        matrix[indexRow][i] /= modulus;
+        i++;
+    }
+}
+
+function normalizeByColumn(weightMatrix) {
+    let j = 0;
+    while(j < weightMatrix[0].length) {
+        let columnSum = 0, i = 0;
+        while(i < weightMatrix.length) {
+            columnSum += Math.pow(weightMatrix[i][j], 2);
+            i++;
+        }
+        const modulus = Math.sqrt(columnSum);
+        let k = 0;
+        while(k < weightMatrix.length) {
+            weightMatrix[k][j] /= modulus;
+            k++;
+        }
+        j++;
+    }
+}
+function differenceMatrices(A, B) {
+    const result = [], height = A.length, width = A[0].length;
+    let i = 0;
+    while(i < height) {
+        result.push(new Array(width));
+        let j = 0;
+        while(j < width) {
+            result[i][j] = A[i][j] - B[i][j];
+            j++;
+        }
+        i++;
+    }
+    return result;
+}
+
+function multiplyMatrixByNumber(matrix, number) {
+    let i = 0;
+    while(i < matrix.length) {
+        let j = 0;
+        while(j < matrix[0].length){
+            matrix[i][j] *= number;
+            j++;
+        }
+        i++;
+    }
+}
+
+document.getElementById('button-learning-steps').addEventListener('click', () => {
+    const steps = +prompt("Learning steps:");
+    if (!steps || isNaN(steps) || steps <= 0 || steps % 1 !== 0) return;
+    let it = 0;
+    while (it < steps) {
+        let i = 0;
+        while(i < learningParameters.parameters.length) {
+            tuneWeights(learningParameters.currentWeights, learningParameters.maxErr, learningParameters.parameters[i]);
+            i++;
+        }
+        de_Compress(learningParameters);
+        it++;
+    }
+    alert('Done!');
+});
+
+
